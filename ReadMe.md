@@ -8,7 +8,8 @@ Modifying the Linux scheduler to reduce the chances that the process would be se
 * Creating a syscall in **sys.c**
 * Adding this syscall to the syscall table: **syscall_64.tbl**
 <br>
-## Testing <br>
+
+## Testing 
 For testing out the system call after compiling the kernel, run
 
     make
