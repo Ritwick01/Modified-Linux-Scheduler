@@ -1,0 +1,83 @@
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index f6b57799c..063dea45e 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -368,8 +368,8 @@
+ 444	common	landlock_create_ruleset	sys_landlock_create_ruleset
+ 445	common	landlock_add_rule	sys_landlock_add_rule
+ 446	common	landlock_restrict_self	sys_landlock_restrict_self
+-447	common	memfd_secret		sys_memfd_secret
+-
++447	common	memfd_secret        sys_memfd_secret
++448	common	delayprocess	    sys_delayprocess
+ #
+ # Due to a historical design error, certain syscalls are numbered differently
+ # in x32 as compared to native x86_64.  These syscalls have numbers 512-547.
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ec8d07d88..e7a123052 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -475,6 +475,7 @@ struct sched_entity {
+ 	u64				prev_sum_exec_runtime;
+ 
+ 	u64				nr_migrations;
++	u64				delayit;
+ 
+ 	struct sched_statistics		statistics;
+ 
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 399c37c95..c2b86e08f 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3956,6 +3956,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
+ 	p->se.prev_sum_exec_runtime	= 0;
+ 	p->se.nr_migrations		= 0;
+ 	p->se.vruntime			= 0;
++	p->se.delayit			= 0;
+ 	INIT_LIST_HEAD(&p->se.group_node);
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 30a6984a5..385655c9e 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -812,6 +812,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
+ 	schedstat_add(cfs_rq->exec_clock, delta_exec);
+ 
+ 	curr->vruntime += calc_delta_fair(delta_exec, curr);
++	curr->vruntime += curr->delayit;
+ 	update_min_vruntime(cfs_rq);
+ 
+ 	if (entity_is_task(curr)) {
+diff --git a/kernel/sys.c b/kernel/sys.c
+index ef1a78f5d..a84363201 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -200,6 +200,27 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
+ 	return error;
+ }
+ 
++SYSCALL_DEFINE2(delayprocess, pid_t, pid, int, timebadhao) 
++{
++    struct pid *ps = NULL;
++    struct task_struct *p;
++    
++    if((pid<0) || (timebadhao<0)){
++        return -EINVAL;
++    }
++
++    long s_delaykaropls = timebadhao*1000000;
++    
++    ps = find_get_pid(pid);
++    if(ps==NULL){
++        return -ESRCH;
++    }
++    p = pid_task(ps,PIDTYPE_PID);
++    p->se.delayit = s_delaykaropls;
++
++    return 0;
++}
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+ 	struct task_struct *g, *p;
